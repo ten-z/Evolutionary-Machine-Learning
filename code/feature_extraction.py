@@ -119,10 +119,22 @@ def add_historical_features(df, hist_maps, center_features, label_column="ice_th
 
 def read_and_reconstruct_data(folder, cols, center_features, k=3, filename="vars-*.txt", year_match=r"vars-(\d{4})\.txt$", label_column="ice_thickness"):
 
+    output_dir = os.path.join(folder, label_column)
+    os.makedirs(output_dir, exist_ok=True)
+
+    output_file = os.path.join(output_dir, f"{label_column}_all_years.csv")
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
     files = glob.glob(os.path.join(folder, filename))
     files = sorted(files, key=lambda fn: int(re.search(year_match, fn).group(1)))
     if (len(files) <= 0):
         raise IndexError(f"no files")
+
+    first_file = True #Only the first file writes the header
+
+    total_data_len = 0
 
     # 1. Read the nth file, get its year
     for fp in files:
@@ -132,9 +144,10 @@ def read_and_reconstruct_data(folder, cols, center_features, k=3, filename="vars
             raise ValueError(f"Cannot parse year from {fp}")
         year = int(match.group(1))
         df_cur = read_and_clean_file(fp, cols)
-        print("data.len = ", len(df_cur))
+
         data = {(r["x_coordinate"], r["y_coordinate"]): r for _, r in df_cur.iterrows()}
-        # print("data = ", data)
+
+        total_data_len = total_data_len + len(df_cur)
 
         base_feats = center_features[2:]
         # 2. Build historical maps for past k years
@@ -164,17 +177,16 @@ def read_and_reconstruct_data(folder, cols, center_features, k=3, filename="vars
         # 4) Add historical features
         recon_with_history = add_historical_features(recon_df, hist_maps, center_features, label_column)
 
-        base = os.path.basename(fp)              # e.g. "vars-2015.txt"
-        name, _ = os.path.splitext(base)         # e.g. ("vars-2015", ".txt")
+        recon_with_history.insert(0, "year", year)
 
-        output_dir = os.path.join(folder, label_column)
-        os.makedirs(output_dir, exist_ok=True)
-
-        output_path = os.path.join(output_dir, f"new-{name}.csv")
-
-        recon_with_history.to_csv(output_path, index=False)
+        if first_file:
+            recon_with_history.to_csv(output_file, index=False, mode="w", encoding="utf-8")
+            first_file = False
+        else:
+            recon_with_history.to_csv(output_file, index=False, mode="a", header=False, encoding="utf-8")
 
         # plot_data(df_clean, x_col="x_coordinate", y_col="y_coordinate", label_col="ice_thickness")
+    print("total_data_len = ", total_data_len)
 
 def plot_data(df, x_col="x_coordinate", y_col="y_coordinate", label_col="ice_thickness"):
     plt.figure(figsize=(8, 6))
@@ -194,10 +206,10 @@ if __name__ == "__main__":
     past_years = 3         # number of past years
 
     # Change the folder where the raw data files are stored
-    folder = "/Users/teng/Documents/Victoria/ResearchAssistant/2.project/High-res-more-variables"
+    folder = "/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-more-variables"
 
     # Configurable column names list (order must match the file's data columns)
-    #### For res-less-variables：
+    ### For res-less-variables：
     # cols = [
     #     "x_coordinate",
     #     "y_coordinate",
@@ -229,9 +241,9 @@ if __name__ == "__main__":
 
     center_features=["x_coordinate", "y_coordinate", "bed_rock_elevation", "precipitation", "air_temperature", "ocean_temperature"]
     # #
-    filename="vars-*.txt"
-    year_match=r"vars-(\d{4})\.txt$"
-    # filename    = "vars-*-lowRes.txt"
-    # year_match  = r"vars-(\d{4})-lowRes\.txt$"
+    # filename="vars-*.txt"
+    # year_match=r"vars-(\d{4})\.txt$"
+    filename    = "vars-*-lowRes.txt"
+    year_match  = r"vars-(\d{4})-lowRes\.txt$"
 
     read_and_reconstruct_data(folder, cols, center_features, past_years, filename, year_match, label_column)
