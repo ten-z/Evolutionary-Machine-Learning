@@ -87,7 +87,7 @@ def reconstruct_dataset(df, label_column="ice_thickness", center_features=["x_co
 
     return pd.DataFrame(new_rows, columns=final_columns)
 
-def add_historical_features(df, hist_maps, center_features, label_column="ice_thickness"):
+def add_historical_features(current_year, df, hist_maps, center_features, label_column="ice_thickness"):
     """
     Given a DataFrame `df` with 'x_coordinate' and 'y_coordinate',
     and a dict hist_maps: year -> {(x,y) -> row},
@@ -102,8 +102,10 @@ def add_historical_features(df, hist_maps, center_features, label_column="ice_th
     label_idx = df.columns.get_loc(label_column)
 
     for year in sorted(hist_maps):
+        n = current_year - year
+        suffix = f"{n}_year_ago" if n == 1 else f"{n}_years_ago"
         for feat in base_feats:
-            col_name = f"{feat}_{year}"
+            col_name = f"{feat}_{suffix}"
 
             ser = df.apply(
                 lambda r, m=hist_maps[year], f=feat:
@@ -175,7 +177,7 @@ def read_and_reconstruct_data(folder, cols, center_features, k=3, filename="vars
         recon_df = reconstruct_dataset(df_cur, label_column, center_features)
 
         # 4) Add historical features
-        recon_with_history = add_historical_features(recon_df, hist_maps, center_features, label_column)
+        recon_with_history = add_historical_features(year, recon_df, hist_maps, center_features, label_column)
 
         recon_with_history.insert(0, "year", year)
 
