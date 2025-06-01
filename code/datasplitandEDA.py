@@ -14,13 +14,16 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 # =====================
-LABEL_COLUMN  = "ice_velocity"
-OUT_DICT     = f"/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-more-variables/{LABEL_COLUMN}"
+LABEL_COLUMN  = "ice_thickness"
+OUT_DICT     = f"/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-less-variables/{LABEL_COLUMN}"
 INPUT_FILE   = f"{OUT_DICT}/{LABEL_COLUMN}_all_years.csv"
 YEAR_COL     = "year"
 TRAIN_RATIO  = 0.8
-TRAIN_OUT    = f"{OUT_DICT}/train.csv"
-TEST_OUT     = f"{OUT_DICT}/test.csv"
+DATA_OUT_DIR     = f"{OUT_DICT}/dataout"
+TRAIN_OUT    = f"{DATA_OUT_DIR}/train.csv"
+TEST_OUT     = f"{DATA_OUT_DIR}/test.csv"
+PREPROCESSED_TRAIN_OUT = f"{DATA_OUT_DIR}/preprocessed_train.csv"
+PREPROCESSED_TEST_OUT = f"{DATA_OUT_DIR}/preprocessed_test.csv"
 PREDICT_OUTPUT_DIR   = f"{OUT_DICT}/model_results"
 RANDOM_SEED = 42
 # =====================
@@ -45,20 +48,20 @@ def split_data():
     train.to_csv(TRAIN_OUT, index=False)
     test .to_csv(TEST_OUT,  index=False)
 
-
     print("total length = ", len(df))
     print("train length = ", len(train))
     print("test length = ", len(test))
 
     return train, test
 
-def data_overview(data):
+def data_overview(data, file_name):
     print("==========data.head==========")
     print(data.head())
     print("==========data.info()==========")
     print(data.info())
     print("==========data.describe()==========")
     print(data.describe())
+    data.describe().T.to_csv(f"{OUT_DICT}/{file_name}")
 
 def missing_value_check(data):
     print("==========Number of missing values==========")
@@ -66,12 +69,14 @@ def missing_value_check(data):
     print("==========Proportion of missing values==========")
     print(data.isnull().mean())
 
-def variable_distribution(data):
+def variable_distribution(data, folder_name):
 
     num_cols = data.select_dtypes(include=np.number).columns.tolist()
 
     exclude = {"x_coordinate", "y_coordinate", "year"}
     num_cols = [c for c in num_cols if c not in exclude]
+    output_img_dir = os.path.join(OUT_DICT, folder_name)
+    os.makedirs(output_img_dir, exist_ok=True)
 
     for col in num_cols:
         fig, axes = plt.subplots(1, 2, figsize=(10, 4), dpi=150)
@@ -82,15 +87,12 @@ def variable_distribution(data):
         plt.suptitle(col, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
 
-
-        output_img_dir = os.path.join(OUT_DICT, "distribution_plot")
-        os.makedirs(output_img_dir, exist_ok=True)
         img_path = os.path.join(output_img_dir, f"{col}_dist_box.png")
         fig.savefig(img_path, bbox_inches='tight')
         plt.close(fig)
 
 
-def correlation_heat_map(data):
+def correlation_heat_map(data, file_name):
     num_cols = data.select_dtypes(include=[np.number]).columns.tolist()
 
     if 'year' in num_cols:
@@ -109,7 +111,7 @@ def correlation_heat_map(data):
     plt.colorbar(im, ax=ax)
     plt.title("Numeric Feature Correlation Matrix", fontsize=12)
 
-    plt.savefig(f"{OUT_DICT}/correlation_matrix.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"{OUT_DICT}/{file_name}", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 def time_trend(data):
@@ -126,15 +128,28 @@ def time_trend(data):
     plt.close()
 
 def geographic_distribution(data):
-    plt.scatter(data["x_coordinate"], data["y_coordinate"],
-            c=data[LABEL_COLUMN], s=5, cmap="viridis")
-    plt.colorbar(label=LABEL_COLUMN)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title("Ice thickness spatial distribution")
+    output_img_dir = os.path.join(OUT_DICT, "geographic_distribution")
+    os.makedirs(output_img_dir, exist_ok=True)
 
-    plt.savefig(f"{OUT_DICT}/geographic_distribution.png", dpi=300, bbox_inches="tight")
-    plt.close()
+    for year, df_year in data.groupby("year"):
+        if df_year.empty:
+            continue
+
+        plt.scatter(
+            df_year["x_coordinate"],
+            df_year["y_coordinate"],
+            c=df_year[LABEL_COLUMN],
+            s=5,
+            cmap="viridis",
+        )
+        plt.colorbar(label=LABEL_COLUMN)
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title(f"{LABEL_COLUMN} Distribution, Year = {year}")
+
+        out_path = os.path.join(output_img_dir, f"geo_dist_{year}.png")
+        plt.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close()
 
 def outlier_data(data):
     Q1 = data["precipitation"].quantile(0.25)
@@ -180,6 +195,9 @@ def preprocess_data(train_df, test_df, impute_strategy: str = 'median'):
     train_processed[numeric_features] = train_scaled
     test_processed[numeric_features]  = test_scaled
 
+    train_processed.to_csv(PREPROCESSED_TRAIN_OUT, index=False)
+    test_processed .to_csv(PREPROCESSED_TEST_OUT,  index=False)
+
     return train_processed, test_processed
 
 def split_X_y(train, test):
@@ -215,23 +233,7 @@ def predict_and_evaluate(model, name, X_train, y_train, X_test, y_test, output_d
     plt.savefig(fname)
     plt.close()
 
-if __name__ == "__main__":
-    train_set, test_set = split_data()
-
-    # data_overview(train_setclear)
-    # missing_value_check(train_set)
-
-    variable_distribution(train_set)
-    correlation_heat_map(train_set)
-    time_trend(train_set)
-    geographic_distribution(train_set)
-
-    train_processed, test_processed = preprocess_data(train_set, test_set)
-
-
-    # predict and evaluate
-    X_train, y_train, X_test, y_test = split_X_y(train_processed, test_processed)
-
+def training_testing_on_diff_models(X_train, y_train, X_test, y_test):
 
     models = [
         (LinearRegression(), "LinearRegression"),
@@ -239,7 +241,7 @@ if __name__ == "__main__":
         (SVR(kernel='rbf', C=1.0, epsilon=0.1),"SVR_RBF"),
         (DecisionTreeRegressor(max_depth=10, random_state=RANDOM_SEED), "DecisionTree"),
         (RandomForestRegressor(n_estimators=100, max_depth=10, random_state=RANDOM_SEED, n_jobs=-1), "RandomForest"),
-        (MLPRegressor(hidden_layer_sizes=(100,50), activation='relu', solver='adam', max_iter=500, random_state=RANDOM_SEED), "MLPRegressor"),
+        (MLPRegressor(hidden_layer_sizes=(100,50), activation='relu', solver='adam', max_iter=500, early_stopping=True, random_state=RANDOM_SEED), "MLPRegressor"),
     ]
 
     os.makedirs(PREDICT_OUTPUT_DIR, exist_ok=True)
@@ -249,3 +251,29 @@ if __name__ == "__main__":
                              X_train, y_train,
                              X_test,  y_test,
                              PREDICT_OUTPUT_DIR, LABEL_COLUMN)
+
+
+if __name__ == "__main__":
+    os.makedirs(DATA_OUT_DIR, exist_ok=True)
+    train_set, test_set = split_data()
+
+    """EDA-raw data"""
+    # data_overview(train_set, "data_describe_summary.csv")
+    # missing_value_check(train_set)
+    # variable_distribution(train_set,"distribution_plot")
+    # correlation_heat_map(train_set, "correlation_matrix.png")
+    # time_trend(train_set)
+    # geographic_distribution(train_set)
+    # outlier_data(train_set)
+
+    train_processed, test_processed = preprocess_data(train_set, test_set)
+
+    """EDA-processed data"""
+    # data_overview(train_processed, "processed_data_describe_summary.csv")
+    # missing_value_check(train_processed)
+    # variable_distribution(train_processed, "PreProcessed_distribution_plot")
+    # correlation_heat_map(train_processed, "PreProcessed_correlation_matrix.png")
+
+    # predict and evaluate
+    X_train, y_train, X_test, y_test = split_X_y(train_processed, test_processed)
+    training_testing_on_diff_models(X_train, y_train, X_test, y_test)

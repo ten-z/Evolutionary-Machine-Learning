@@ -211,7 +211,7 @@ if __name__ == "__main__":
     folder = "/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-more-variables"
 
     # Configurable column names list (order must match the file's data columns)
-    ### For res-less-variables：
+    """ For res-less-variables："""
     # cols = [
     #     "x_coordinate",
     #     "y_coordinate",
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     # filename="vars-*.txt"
     # year_match=r"vars-(\d{4})\.txt$"
 
-    #### For res-more-variables：
+    """ For res-more-variables："""
     cols = [
         "x_coordinate",
         "y_coordinate",
