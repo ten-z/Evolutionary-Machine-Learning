@@ -14,8 +14,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 # =====================
-LABEL_COLUMN  = "ice_thickness"
-OUT_DICT     = f"/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-less-variables/{LABEL_COLUMN}"
+LABEL_COLUMN  = "ice_velocity"
+OUT_DICT     = f"/Users/teng/Documents/Victoria/ResearchAssistant/2.project/Low-res-more-variables/{LABEL_COLUMN}"
 INPUT_FILE   = f"{OUT_DICT}/{LABEL_COLUMN}_all_years.csv"
 YEAR_COL     = "year"
 TRAIN_RATIO  = 0.8
@@ -162,7 +162,12 @@ def outlier_data(data):
     print("Number of precipitation outliers:", len(outliers))
 
 def preprocess_data(train_df, test_df, impute_strategy: str = 'median'):
-    numeric_features = train_df.select_dtypes(include='number').columns.tolist()
+    all_numeric = train_df.select_dtypes(include='number').columns.tolist()
+
+    if LABEL_COLUMN in all_numeric:
+        numeric_features = [col for col in all_numeric if col != LABEL_COLUMN]
+    else:
+        numeric_features = all_numeric.copy()
 
     # Outlier Handling
     train_clipped = train_df[numeric_features].copy()
@@ -269,10 +274,10 @@ if __name__ == "__main__":
     train_processed, test_processed = preprocess_data(train_set, test_set)
 
     """EDA-processed data"""
-    # data_overview(train_processed, "processed_data_describe_summary.csv")
+    data_overview(train_processed, "processed_data_describe_summary.csv")
     # missing_value_check(train_processed)
-    # variable_distribution(train_processed, "PreProcessed_distribution_plot")
-    # correlation_heat_map(train_processed, "PreProcessed_correlation_matrix.png")
+    variable_distribution(train_processed, "PreProcessed_distribution_plot")
+    correlation_heat_map(train_processed, "PreProcessed_correlation_matrix.png")
 
     # predict and evaluate
     X_train, y_train, X_test, y_test = split_X_y(train_processed, test_processed)
